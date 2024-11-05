@@ -1,7 +1,7 @@
 const axios = require('axios');
 require('dotenv').config();
 
-const githubToken = process.env.GITHUB_TOKEN;
+const githubToken = process.env.API_GITHUB_TOKEN;
 const owner = 'rainlanguage';
 const repo = 'rain.orderbook';
 const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
@@ -76,7 +76,7 @@ ${commitMessages}
     
     console.log(report);
 
-    // await createRelease(`pr-${pr.number}`, `Report for PR #${pr.number}`, report);
+    await createRelease(`pr-${pr.number}`, `Report for PR #${pr.number}`, report);
 
     // You can add code to store or send this report, e.g., save to a file or send via email
   } catch (error) {
