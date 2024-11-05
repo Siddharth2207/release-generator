@@ -11,8 +11,29 @@
       let
         pkgs = rainix.pkgs.${system};
       in rec {
-        packages = rainix.packages.${system};
-        devShells = rainix.devShells.${system};
+        packages = rec{
+
+          generate-report = rainix.mkTask.${system} {
+            name = "generate-report";
+            body = ''
+              set -euxo pipefail
+              npm install
+              node index.js
+              
+            '';
+          };
+        } // rainix.packages.${system};
+
+        devShells.default = pkgs.mkShell {
+          packages = [
+            packages.generate-report
+          ];
+
+          shellHook = rainix.devShells.${system}.default.shellHook;
+          buildInputs = rainix.devShells.${system}.default.buildInputs;
+          nativeBuildInputs = rainix.devShells.${system}.default.nativeBuildInputs;
+        };
+
       }
     );
 

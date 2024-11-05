@@ -40,4 +40,4 @@ jobs:
       - name: Fetch Merged PRs and Generate Report
         env:
           API_GITHUB_TOKEN: ${{ secrets.API_GITHUB_TOKEN }}
-        run: node index.js
+        run: nix develop -c generate-report
