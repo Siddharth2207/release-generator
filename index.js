@@ -6,6 +6,27 @@ const owner = 'rainlanguage';
 const repo = 'rain.orderbook';
 const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
 
+const report_owner = 'Siddharth2207'
+const report_repo = `release-generator`
+const report_repo_base = `https://api.github.com/repos/${report_owner}/${report_repo}`;
+
+async function createRelease(tagName, releaseName, body) {
+    try {
+      await axios.post(`${report_repo_base}/releases`, {
+        tag_name: tagName,
+        name: releaseName,
+        body: body,
+        draft: true,
+      }, {
+        headers: { Authorization: `token ${githubToken}` },
+      });
+
+      console.log(`Release created for ${releaseName}`);
+    } catch (error) {
+      console.error('Error creating release:', error.message);
+    }
+  }
+
 // Function to fetch and generate report for recent merged PRs
 async function fetchMergedPRs() {
   try {
@@ -52,8 +73,10 @@ ${pr.body || 'No description provided.'}
 ${commitMessages}
 
     `;
-
+    
     console.log(report);
+
+    // await createRelease(`pr-${pr.number}`, `Report for PR #${pr.number}`, report);
 
     // You can add code to store or send this report, e.g., save to a file or send via email
   } catch (error) {
@@ -63,5 +86,3 @@ ${commitMessages}
 
 // Execute the script
 fetchMergedPRs();
-
-
