@@ -8,7 +8,7 @@ dotenv.config();
 const githubToken = process.env.API_GITHUB_TOKEN as string;
 const openaiToken = process.env.OPENAI_API_KEY as string;
 const owner = 'rainlanguage';
-const repos = ['rain.orderbook']; // Add additional repos as needed
+const repos = ['rain.orderbook', 'rain.webapp']; // Add additional repos as needed
 const reportOwner = 'Siddharth2207';
 const reportRepo = `raindex-releases`;
 const reportRepoBase = `https://api.github.com/repos/${reportOwner}/${reportRepo}`;
