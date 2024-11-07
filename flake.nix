@@ -13,20 +13,41 @@
       in rec {
         packages = rec{
 
-          generate-report = rainix.mkTask.${system} {
-            name = "generate-report";
+          build-js-bindings = rainix.mkTask.${system} {
+            name = "build-js-bindings";
             body = ''
               set -euxo pipefail
               npm install
-              node index.js
+              npm run build
+            '';
+          };
+
+          raindex-release = rainix.mkTask.${system} {
+            name = "raindex-release";
+            body = ''
+              set -euxo pipefail
+              node dist/raindex-release.js
               
             '';
           };
+
+          rainlanguage-release = rainix.mkTask.${system} {
+            name = "rainlanguage-release";
+            body = ''
+              set -euxo pipefail
+              npm install
+              node dist/rainlanguage-release.js
+              
+            '';
+          };
+          
         } // rainix.packages.${system};
 
         devShells.default = pkgs.mkShell {
           packages = [
-            packages.generate-report
+            packages.build-js-bindings
+            packages.raindex-release
+            packages.rainlanguage-release
           ];
 
           shellHook = rainix.devShells.${system}.default.shellHook;

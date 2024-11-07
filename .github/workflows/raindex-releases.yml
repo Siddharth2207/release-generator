@@ -1,4 +1,4 @@
-name: PR Merge Report to Releases
+name: Raindex Releases
 
 on:
   schedule:
@@ -37,7 +37,11 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@v4
       - uses: DeterminateSystems/magic-nix-cache-action@v2
 
-      - name: Fetch Merged PRs and Generate Report
+      - name: Install and Build Dependencies
+        run: nix develop -c build-js-bindings
+
+      - name: Raindex release
         env:
           API_GITHUB_TOKEN: ${{ secrets.API_GITHUB_TOKEN }}
-        run: nix develop -c generate-report
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: nix develop -c raindex-release
