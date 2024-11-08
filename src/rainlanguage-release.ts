@@ -1,30 +1,27 @@
 import axios from 'axios';
 import * as dotenv from 'dotenv';
-import { Commit, PullRequest, ReleaseResponse, TagAndReleaseNames, ChatGPTResponse, AxiosError } from './types';
-
+import { Commit, PullRequest, ReleaseResponse, ChatGPTResponse } from './types';
 
 dotenv.config();
 
 const githubToken = process.env.API_GITHUB_TOKEN as string;
 const openaiToken = process.env.OPENAI_API_KEY as string;
 
-// GitHub organization and repositories
 const org = 'rainlanguage';
 const repos = [
   'rain.interpreter',
   'rain.interpreter.interface',
   'rain.orderbook.interface',
   'rain.math.float',
-  'rain.flare'
+  'rain.flare',
+  'rain.orderbook', 
+  'rain.webapp'
 ];
 
-// Report repository details
 const reportOwner = 'Siddharth2207';
 const reportRepo = 'rainlanguage-releases';
 const reportRepoBase = `https://api.github.com/repos/${reportOwner}/${reportRepo}`;
 
-
-// Function to start the release process for all repositories
 async function startReleaseProcess(): Promise<void> {
   let aggregateReport = '';
 
@@ -49,7 +46,6 @@ async function startReleaseProcess(): Promise<void> {
   }
 }
 
-// Function to fetch the latest commit on the main branch
 async function fetchLatestMainCommit(owner: string, repo: string, apiBase: string): Promise<string | void> {
   try {
     const { data: commits } = await axios.get<Commit[]>(`${apiBase}/commits`, {
@@ -73,7 +69,6 @@ async function fetchLatestMainCommit(owner: string, repo: string, apiBase: strin
   }
 }
 
-// Function to find PR for a given commit SHA
 async function findPRForCommit(commitSha: string, apiBase: string): Promise<PullRequest | null> {
   try {
     const { data: prs } = await axios.get<PullRequest[]>(`${apiBase}/commits/${commitSha}/pulls`, {
@@ -89,7 +84,6 @@ async function findPRForCommit(commitSha: string, apiBase: string): Promise<Pull
   }
 }
 
-// Function to generate a report for a given PR, including commit messages and diff summary
 async function generateReportForPR(pr: PullRequest, apiBase: string): Promise<string | void> {
   try {
     const { data: commits } = await axios.get<Commit[]>(`${apiBase}/pulls/${pr.number}/commits`, {
@@ -98,25 +92,31 @@ async function generateReportForPR(pr: PullRequest, apiBase: string): Promise<st
 
     const commitMessages = commits.map(commit => `- ${commit.commit.message}`).join('\n');
     const diff = await fetchDiffForPR(pr.number, apiBase);
-    const diffSummary = await analyzeDiffWithChatGPT(diff);
+
+    const releaseNotes = await generateReleaseNotes(pr.body, diff);
 
     return `
-### PR #${pr.number} - ${pr.title}
-- **Author**: ${pr.user.login}
-- **Merged At**: ${pr.merged_at}
+# Raindex Release Notes - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
 
-#### Commit Messages
+## ${pr.title} - [${formatTimeAgo(pr.merged_at)}]
+
+${releaseNotes}
+
+---
+
+### 📜 Full PR Description
+> ${pr.body || 'No additional details provided.'}
+
+---
+
+### 📄 Detailed Commit Messages
 ${commitMessages}
-
-#### Code Diff Summary
-${diffSummary}
     `;
   } catch (error) {
     console.error(`Error generating report for PR #${pr.number}:`, (error as Error).message);
   }
 }
 
-// Function to fetch the code diff for a PR
 async function fetchDiffForPR(prNumber: number, apiBase: string): Promise<string> {
   try {
     const { data } = await axios.get<string>(`${apiBase}/pulls/${prNumber}`, {
@@ -132,21 +132,27 @@ async function fetchDiffForPR(prNumber: number, apiBase: string): Promise<string
   }
 }
 
-// Function to send the diff to ChatGPT API and get a summary
-async function analyzeDiffWithChatGPT(diff: string): Promise<string> {
+async function generateReleaseNotes(prBody: string | null, diff: string): Promise<string> {
   try {
-    const response = await axios.post(
+    const response = await axios.post<ChatGPTResponse>(
       'https://api.openai.com/v1/chat/completions',
       {
         model: "gpt-4o",
         messages: [
           {
             role: "system",
-            content: "You are a code review assistant. Summarize the code diffs provided, highlighting key changes, optimizations, and potential issues.",
+            content: `You are an expert release notes generator. Based on the provided PR summary and code diff, generate a clear, human-readable release note with the following sections:
+            
+            - "Overview" (a concise summary of the main changes)
+            - "🎯 Highlights" (key improvements or features)
+            - "🏗️ Architecture Changes" (technical updates to the system architecture)
+            - "🧪 Tests" (details on tests added or updates in testing)
+            
+            If a section is not relevant, write "No information available." Ensure the response is in markdown format with each section starting with a header (###).`,
           },
           {
             role: "user",
-            content: `Here is the code diff:\n\n${diff}`,
+            content: `PR Summary:\n\n${prBody || 'No summary provided.'}\n\nCode Diff:\n\n${diff}`,
           },
         ],
       },
@@ -157,14 +163,28 @@ async function analyzeDiffWithChatGPT(diff: string): Promise<string> {
         },
       }
     );
+
+    // Directly return ChatGPT's response without parsing
     return response.data.choices[0].message.content.trim();
+
   } catch (error) {
-    console.error('Error analyzing diff with ChatGPT:', (error as Error).message);
-    return 'Diff analysis could not be generated.';
+    console.error('Error generating release notes with ChatGPT:', (error as Error).message);
+    return `
+### Overview
+No information available.
+
+### 🎯 Highlights
+No information available.
+
+### 🏗️ Architecture Changes
+No information available.
+
+### 🧪 Tests
+No information available.
+    `;
   }
 }
 
-// Function to generate a report for a standalone commit
 async function generateCommitReport(commit: Commit): Promise<string> {
   return `
 ### Commit ${commit.sha}
@@ -174,7 +194,6 @@ async function generateCommitReport(commit: Commit): Promise<string> {
   `;
 }
 
-// Function to create a draft release with the aggregated report and return its ID
 async function createDraftRelease(tagName: string, releaseName: string, body: string): Promise<number | void> {
   try {
     const { data: release } = await axios.post<ReleaseResponse>(`${reportRepoBase}/releases`, {
@@ -193,7 +212,6 @@ async function createDraftRelease(tagName: string, releaseName: string, body: st
   }
 }
 
-// Function to publish a draft release by setting draft: false
 async function publishDraftRelease(releaseId: number): Promise<void> {
   try {
     await axios.patch(`${reportRepoBase}/releases/${releaseId}`, {
@@ -208,5 +226,12 @@ async function publishDraftRelease(releaseId: number): Promise<void> {
   }
 }
 
-// Execute the release process for all repositories
+function formatTimeAgo(dateString: string | null): string {
+  if (!dateString) return 'Unknown';
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffInHours = Math.round((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+  return `${diffInHours} hours ago`;
+}
+
 startReleaseProcess();
