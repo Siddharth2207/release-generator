@@ -90,11 +90,34 @@ async function generateReportForPR(pr: PullRequest, repo: string, commitSha: str
     // Generate structured sections using ChatGPT
     const structuredSummary = await analyzeStructuredSummaryWithChatGPT(pr.body, diff);
 
+    // Extract the issue number if present
+    const issueMatch = pr.body?.match(/#(\d+)/);
+    const issueNumber = issueMatch ? issueMatch[1] : null;
+    const issueLink = issueNumber ? `https://github.com/${owner}/${repo}/issues/${issueNumber}` : null;
+    const issueSection = issueNumber ? `See issue: [#${issueNumber}](${issueLink})` : '';
+
+    // Extract the solution section from PR description
+    const solutionSectionMatch = pr.body?.match(/## Solution\s*\n([\s\S]*?)(?=\n##|$)/);
+    const solutionSection = solutionSectionMatch ? solutionSectionMatch[1].trim() : 'No solution provided.';
+
     // App release link for rain.orderbook
     const appReleaseLink = repo === 'rain.orderbook'
       ? `\n### 🌐 App Release\n[View Release on GitHub](https://github.com/rainlanguage/rain.orderbook/releases/tag/${tagName})\n`
       : '';
 
+    // Links Section
+    const additionalLinks = `
+---
+
+- 🔖 [View Release on GitHub](https://github.com/${reportOwner}/${reportRepo}/releases/tag/${tagName})
+- 📜 [Latest Releases](https://github.com/rainlanguage/rain.orderbook/releases/tag/${tagName})
+- 📚 [Documentation](https://docs.rainprotocol.xyz)
+- 🌐 [Community](https://t.me/+w4mJbCT6IfI2YTU0)
+- 🐦 [Twitter](https://x.com/rainprotocol)
+- 💻 [GitHub](https://github.com/rainlanguage)
+`;
+
+    // Generate the report with modified PR Description section
     const report = `
 # Raindex Release Notes - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
 
@@ -126,12 +149,17 @@ ${appReleaseLink}
 ---
 
 ### 📜 Full PR Description
-> ${pr.body || 'No additional details provided.'}
+${issueSection}
+
+## Solution
+${solutionSection}
 
 ---
 
 ### 📄 Detailed Commit Messages
 ${commitMessages}
+
+${additionalLinks}
 `;
 
     console.log(report);
@@ -176,7 +204,6 @@ async function analyzeStructuredSummaryWithChatGPT(prBody: string | null, diff: 
       }
     );
 
-    // Ensure structured sections are returned as an object
     const content = response.data.choices[0].message.content.trim();
     return {
       overview: content.includes("Overview") ? content.split("Overview")[1].split("🎯")[0].trim() : "No information available.",
