@@ -29,7 +29,7 @@ async function startReleaseProcess(): Promise<void> {
     const repoApiBase = `https://api.github.com/repos/${org}/${repo}`;
     const report = await fetchLatestMainCommit(org, repo, repoApiBase);
     if (report) {
-      aggregateReport += `## ${repo}\n${report}\n\n`;
+      aggregateReport += `**## ${repo}**\n${report}\n\n`;
     }
   }
 
@@ -59,7 +59,7 @@ async function fetchLatestMainCommit(owner: string, repo: string, apiBase: strin
     const pr = await findPRForCommit(latestCommit.sha, apiBase);
     if (pr) {
       console.log(`Latest commit in ${repo} is associated with PR #${pr.number}`);
-      return await generateReportForPR(pr, apiBase);
+      return await generateReportForPR(pr, apiBase, repo);
     } else {
       console.log(`Latest commit in ${repo} is not associated with any PR.`);
       return await generateCommitReport(latestCommit);
@@ -84,7 +84,7 @@ async function findPRForCommit(commitSha: string, apiBase: string): Promise<Pull
   }
 }
 
-async function generateReportForPR(pr: PullRequest, apiBase: string): Promise<string | void> {
+async function generateReportForPR(pr: PullRequest, apiBase: string, repo: string): Promise<string | void> {
   try {
     const { data: commits } = await axios.get<Commit[]>(`${apiBase}/pulls/${pr.number}/commits`, {
       headers: { Authorization: `token ${githubToken}` },
@@ -93,19 +93,26 @@ async function generateReportForPR(pr: PullRequest, apiBase: string): Promise<st
     const commitMessages = commits.map(commit => `- ${commit.commit.message}`).join('\n');
     const diff = await fetchDiffForPR(pr.number, apiBase);
 
-    const releaseNotes = await generateReleaseNotes(pr.body, diff);
+    // Generate release notes and remove any unintended markdown quote formatting
+    const releaseNotes = (await generateReleaseNotes(pr.body, diff)).replace(/^`{3}markdown|`{3}$/g, '');
+
+    // Extract issue link if present in the PR body
+    const issueMatch = pr.body?.match(/#(\d+)/);
+    const issueNumber = issueMatch ? issueMatch[1] : null;
+    const issueLink = issueNumber ? `https://github.com/${org}/${repo}/issues/${issueNumber}` : null;
+    const issueSection = issueLink ? `See issue: [#${issueNumber}](${issueLink})` : 'No linked issue.';
 
     return `
-# Raindex Release Notes - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-
-## ${pr.title} - [${formatTimeAgo(pr.merged_at)}]
-
+### Overview
 ${releaseNotes}
 
 ---
 
 ### 📜 Full PR Description
-> ${pr.body || 'No additional details provided.'}
+${issueSection}
+
+## Solution
+${pr.body?.replace(/## Checks[\s\S]*/g, '') || 'No solution provided.'}
 
 ---
 
@@ -164,7 +171,6 @@ async function generateReleaseNotes(prBody: string | null, diff: string): Promis
       }
     );
 
-    // Directly return ChatGPT's response without parsing
     return response.data.choices[0].message.content.trim();
 
   } catch (error) {
@@ -235,3 +241,4 @@ function formatTimeAgo(dateString: string | null): string {
 }
 
 startReleaseProcess();
+  

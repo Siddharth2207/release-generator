@@ -90,48 +90,77 @@ async function generateReportForPR(pr: PullRequest, repo: string, commitSha: str
     // Generate structured sections using ChatGPT
     const structuredSummary = await analyzeStructuredSummaryWithChatGPT(pr.body, diff);
 
+    // Extract the issue number if present
+    const issueMatch = pr.body?.match(/#(\d+)/);
+    const issueNumber = issueMatch ? issueMatch[1] : null;
+    const issueLink = issueNumber ? `https://github.com/${owner}/${repo}/issues/${issueNumber}` : null;
+    const issueSection = issueNumber ? `See issue: [#${issueNumber}](${issueLink})` : '';
+
+    // Extract the solution section from PR description
+    const solutionSectionMatch = pr.body?.match(/## Solution\s*\n([\s\S]*?)(?=\n##|$)/);
+    const solutionSection = solutionSectionMatch ? solutionSectionMatch[1].trim() : 'No solution provided.';
+
     // App release link for rain.orderbook
     const appReleaseLink = repo === 'rain.orderbook'
-      ? `\n### 🌐 App Release\n[View Release on GitHub](https://github.com/rainlanguage/rain.orderbook/releases/tag/${tagName})\n`
-      : '';
+      ? `\n### App Release\n[View Release on GitHub](https://github.com/rainlanguage/rain.orderbook/releases/tag/${tagName})\n`
+      : `\n### App Release\n[raindex.finance](https://raindex.finance/)\n`;
 
+    // Links Section
+    const additionalLinks = `
+---
+
+- [Latest Releases](https://github.com/rainlanguage/rain.orderbook/releases/tag/${tagName})
+- [Documentation](https://docs.rainprotocol.xyz)
+- [Community](https://t.me/+w4mJbCT6IfI2YTU0)
+- [𝕏](https://x.com/rainprotocol)
+- [GitHub](https://github.com/rainlanguage)
+`;
+
+    // Generate the report with modified PR Description section
     const report = `
-# Raindex Release Notes - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
 
-## Release: ${releaseName}
+## Raindex Release Notes - ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+## [View Release on GitHub](https://github.com/${reportOwner}/${reportRepo}/releases/tag/${tagName})
 
-### ⬆️ Overview
-> ${structuredSummary.overview || "This release includes important updates."}
+### Overview
+${structuredSummary.overview || "This release includes important updates."}
+
 
 - **PR Summary**: ${pr.title}
-  - **Author**: ${pr.user.login}
-  - **Merged At**: ${formatTimeAgo(pr.merged_at)}
+- **Author**: ${pr.user.login}
+- **Merged At**: ${formatTimeAgo(pr.merged_at)}
 
 ---
 
-### 🎯 Highlights
+### Highlights
 ${structuredSummary.highlights || "- No specific highlights noted."}
 
-### 🏗️ Architecture Changes
+### Architecture Changes
 ${structuredSummary.architectureChanges || "- No architectural changes introduced."}
 
-### 🔍 Code Diff Analysis
+### Code Diff Analysis
 ${structuredSummary.diffAnalysis || "- No code analysis available."}
 
-### 🧪 Tests
+### Tests
 ${structuredSummary.testing || "- No testing updates provided."}
 
 ${appReleaseLink}
 
 ---
 
-### 📜 Full PR Description
-> ${pr.body || 'No additional details provided.'}
+### Full PR Description
+${issueSection}
+
+## Solution
+${solutionSection}
 
 ---
 
-### 📄 Detailed Commit Messages
+### Detailed Commit Messages
 ${commitMessages}
+
+### Rainlang Community
+${additionalLinks}
 `;
 
     console.log(report);
@@ -155,10 +184,10 @@ async function analyzeStructuredSummaryWithChatGPT(prBody: string | null, diff: 
             content: `You are an expert release notes generator. Based on the provided PR summary and code diff, generate detailed release notes structured as follows:
 
             - "Overview" (concise summary of the release)
-            - "🎯 Highlights" (list of significant highlights)
-            - "🏗️ Architecture Changes" (technical changes to the system architecture)
-            - "🔍 Code Diff Analysis" (specific code changes, optimizations)
-            - "🧪 Tests" (any updates or changes in testing)
+            - "Highlights" (list of significant highlights)
+            - "Architecture Changes" (technical changes to the system architecture)
+            - "Code Diff Analysis" (specific code changes, optimizations)
+            - "Tests" (any updates or changes in testing)
             
             If a section is not relevant, provide "No information available."`,
           },
@@ -176,14 +205,13 @@ async function analyzeStructuredSummaryWithChatGPT(prBody: string | null, diff: 
       }
     );
 
-    // Ensure structured sections are returned as an object
     const content = response.data.choices[0].message.content.trim();
     return {
-      overview: content.includes("Overview") ? content.split("Overview")[1].split("🎯")[0].trim() : "No information available.",
-      highlights: content.includes("🎯 Highlights") ? content.split("🎯 Highlights")[1].split("🏗️")[0].trim() : "No specific highlights noted.",
-      architectureChanges: content.includes("🏗️ Architecture Changes") ? content.split("🏗️ Architecture Changes")[1].split("🔍")[0].trim() : "No architectural changes introduced.",
-      diffAnalysis: content.includes("🔍 Code Diff Analysis") ? content.split("🔍 Code Diff Analysis")[1].split("🧪")[0].trim() : "No code analysis available.",
-      testing: content.includes("🧪 Tests") ? content.split("🧪 Tests")[1].trim() : "No testing updates provided.",
+      overview: content.includes("Overview") ? content.split("Overview")[1].split("Highlights")[0].trim() : "No information available.",
+      highlights: content.includes("Highlights") ? content.split("Highlights")[1].split("Architecture Changes")[0].trim() : "No specific highlights noted.",
+      architectureChanges: content.includes("Architecture Changes") ? content.split("Architecture Changes")[1].split("Code Diff Analysis")[0].trim() : "No architectural changes introduced.",
+      diffAnalysis: content.includes("Code Diff Analysis") ? content.split("Code Diff Analysis")[1].split("Tests")[0].trim() : "No code analysis available.",
+      testing: content.includes("Tests") ? content.split("Tests")[1].trim() : "No testing updates provided.",
     };
   } catch (error) {
     console.error('Error analyzing structured summary with ChatGPT:', (error as Error).message);
