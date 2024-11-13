@@ -52,6 +52,7 @@ async function fetchLatestMainCommit(apiBase: string, repo: string): Promise<voi
     }
   } catch (error) {
     console.error(`Error fetching latest commit for ${repo}:`, (error as Error).message);
+    throw error;
   }
 }
 
@@ -168,6 +169,7 @@ ${additionalLinks}
     await createRelease(tagName, releaseName, report);
   } catch (error) {
     console.error(`Error generating report for PR #${pr.number}:`, (error as Error).message);
+    throw error;
   }
 }
 
@@ -277,6 +279,8 @@ ${commit.commit.message}
     await createRelease(tagName, releaseName, report);
   } catch (error) {
     console.error(`Error generating report for commit ${commit.sha}:`, (error as Error).message);
+    throw error;
+
   }
 }
 
@@ -303,6 +307,7 @@ async function createRelease(tagName: string, releaseName: string, body: string)
     } else {
       console.error("An unknown error occurred:", error);
     }
+    throw error;
   }
 }
 
