@@ -35,7 +35,6 @@
             name = "rainlanguage-release";
             body = ''
               set -euxo pipefail
-              npm install
               node dist/rainlanguage-release.js
               
             '';
