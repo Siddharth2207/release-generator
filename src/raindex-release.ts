@@ -4,7 +4,7 @@ import { Commit, PullRequest, ReleaseResponse, ChatGPTResponse } from './types';
 
 dotenv.config();
 
-const githubToken = process.env.API_GITHUB_TOKEN as string;
+const githubToken = 'process.env.API_GITHUB_TOKEN as string';
 const openaiToken = process.env.OPENAI_API_KEY as string;
 const owner = 'rainlanguage';
 const repos = ['rain.orderbook', 'rain.webapp'];
